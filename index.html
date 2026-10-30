@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>法式漂流信</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@400;700&family=Ma+Shan+Zheng&display=swap" rel="stylesheet">
+
+    <style>
+        /* 样式部分完全不变 */
+        body {
+            background-image: url('images/bg.jpg');
+            background-size: cover;
+            background-position: center;
+            background-attachment: fixed;
+            background-color: #f3efe6; 
+            font-family: 'Caveat', 'Ma Shan Zheng', cursive;
+            margin: 0;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            overflow: hidden; 
+        }
+        .main-container { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; width: 100%; position: relative; }
+        
+        #receive-view { display: flex; flex-direction: column; align-items: center; transition: opacity 0.5s; }
+        .envelope-wrapper { position: relative; width: 600px; height: 400px; perspective: 1000px; }
+        .envelope-back { position: absolute; width: 100%; height: 100%; background-color: #dcd3c3; border-radius: 8px; z-index: 1; box-shadow: 0 20px 40px rgba(0,0,0,0.15); }
+        .letter-paper {
+            position: absolute; top: 20px; left: 50%; transform: translateX(-50%) translateY(0); 
+            width: 500px; height: 350px; background-image: url('images/paper.png'); background-size: cover; background-position: center; background-color: #fffcf5;
+            border-radius: 4px; padding: 40px; box-sizing: border-box; z-index: 2; box-shadow: 0 10px 20px rgba(0,0,0,0.1); display: flex; flex-direction: column;
+        }
+        .letter-content { font-size: 2rem; color: #2b2b2b; line-height: 1.6; flex-grow: 1; text-shadow: 1px 1px 2px rgba(255,255,255,0.8); white-space: pre-wrap;}
+        .envelope-front { position: absolute; bottom: 0; left: 0; width: 100%; height: 250px; background-color: #e6ddcc; border-radius: 0 0 8px 8px; z-index: 3; box-shadow: inset 0 10px 20px rgba(0,0,0,0.03), 0 20px 40px rgba(0,0,0,0.1); clip-path: polygon(0 0, 50% 40%, 100% 0, 100% 100%, 0 100%); }
+        .envelope-flap { position: absolute; top: 0; left: 0; width: 100%; height: 200px; background-color: #d8cdb9; z-index: 4; transform-origin: top; transition: transform 0.8s cubic-bezier(0.4, 0, 0.2, 1); border-radius: 8px 8px 0 0; clip-path: polygon(0 0, 100% 0, 50% 100%); filter: drop-shadow(0 4px 6px rgba(0,0,0,0.1)); }
+        .wax-seal { position: absolute; top: 180px; left: 50%; transform: translateX(-50%); width: 60px; height: 60px; background: radial-gradient(circle, #a82e2e 0%, #7a1616 100%); border-radius: 50%; z-index: 5; box-shadow: 0 4px 8px rgba(0,0,0,0.3), inset -2px -2px 5px rgba(0,0,0,0.4); cursor: pointer; transition: all 0.3s; }
+        .wax-seal:hover { transform: translateX(-50%) scale(1.05); }
+        .letter-style-tag { font-family: sans-serif; font-size: 0.9rem; color: #666; text-align: right; border-top: 1px dashed rgba(150,150,150,0.5); padding-top: 15px; }
+
+        #write-view { display: none; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 50; opacity: 0; }
+        .write-paper { width: 500px; height: 500px; background-color: #fffcf5; background-image: url('images/paper.png'); background-size: cover; border-radius: 8px; padding: 40px; box-sizing: border-box; box-shadow: 0 20px 50px rgba(0,0,0,0.3); display: flex; flex-direction: column; }
+        .write-textarea { width: 100%; flex-grow: 1; background: transparent; border: none; outline: none; resize: none; font-family: 'Caveat', 'Ma Shan Zheng', cursive; font-size: 2rem; color: #2b2b2b; line-height: 1.6; }
+        .write-textarea::placeholder { color: #aaa; font-family: 'Ma Shan Zheng', cursive; opacity: 0.6; }
+        .send-btn { margin-top: 20px; padding: 12px; background-color: #5a4b36; color: white; border: none; border-radius: 30px; font-size: 1.2rem; font-family: 'Ma Shan Zheng', cursive; cursor: pointer; box-shadow: 0 4px 10px rgba(0,0,0,0.2); transition: background 0.3s; }
+        .send-btn:hover { background-color: #3a2e1e; }
+        .send-btn:disabled { background-color: #999; cursor: not-allowed; }
+
+        .bottom-nav { position: absolute; bottom: 50px; display: flex; gap: 30px; z-index: 100; }
+        .nav-btn { padding: 15px 40px; font-size: 1.3rem; font-family: 'Ma Shan Zheng', cursive; background-color: #fffcf5; border: 2px solid #8a7b66; color: #5a4b36; border-radius: 30px; cursor: pointer; box-shadow: 0 4px 15px rgba(0,0,0,0.2); transition: all 0.3s; }
+        .nav-btn:hover { background-color: #8a7b66; color: white; transform: translateY(-3px); }
+
+        .hint { position: absolute; bottom: 120px; color: #fff; text-shadow: 1px 1px 3px rgba(0,0,0,0.5); font-family: sans-serif; font-size: 1rem; animation: pulse 2s infinite; z-index: 10;}
+        @keyframes pulse { 0%, 100% { opacity: 0.5; } 50% { opacity: 1; } }
+    </style>
+</head>
+<body>
+
+    <div class="main-container">
+        
+        <div id="receive-view">
+            <div class="envelope-wrapper">
+                <div class="envelope-back"></div>
+                <div class="letter-paper" id="letter">
+                    <div class="letter-content" id="letter-content">正在茫茫大海中寻找信件...</div>
+                    <div class="letter-style-tag" id="letter-style">信纸：未知</div>
+                </div>
+                <div class="envelope-front"></div>
+                <div class="envelope-flap" id="flap"></div>
+                <div class="wax-seal" id="seal"></div>
+            </div>
+            <div class="hint" id="receive-hint">👆 点击火漆印拆开信封</div>
+        </div>
+
+        <div id="write-view">
+            <div class="write-paper" id="write-paper">
+                <textarea class="write-textarea" id="write-input" placeholder="写下你的思绪，让它随着海浪漂向远方..."></textarea>
+                <button class="send-btn" id="send-btn" onclick="sendLetter()">折叠并投递 🕊️</button>
+            </div>
+        </div>
+
+        <div class="bottom-nav">
+            <button class="nav-btn" onclick="switchView('receive')">📥 捞一封信</button>
+            <button class="nav-btn" onclick="switchView('write')">✍️ 扔个漂流瓶</button>
+        </div>
+
+    </div>
+
+    <script>
+        const supabaseUrl = 'https://jotgenecgqrlhnkyisvn.supabase.co'; 
+        const supabaseKey = 'sb_publishable_vjj3Vt2R87sW5h-EC3CP-g_NmheY2EZ'; 
+        const db = window.supabase.createClient(supabaseUrl, supabaseKey);
+
+        let currentLetterId = null; 
+
+        // 【新增】从浏览器本地缓存获取“我”已经捞过的信件 ID 列表
+        function getSeenLetters() {
+            const seen = localStorage.getItem('seen_letters');
+            return seen ? JSON.parse(seen) : [];
+        }
+
+        // 【新增】将捞到的信件 ID 存入本地缓存
+        function addSeenLetter(id) {
+            const seen = getSeenLetters();
+            if (!seen.includes(id)) {
+                seen.push(id);
+                localStorage.setItem('seen_letters', JSON.stringify(seen));
+            }
+        }
+
+        function switchView(viewName) {
+            const receiveView = document.getElementById('receive-view');
+            const writeView = document.getElementById('write-view');
+
+            if (viewName === 'receive') {
+                gsap.to(writeView, { opacity: 0, duration: 0.3, onComplete: () => {
+                    writeView.style.display = 'none';
+                    receiveView.style.display = 'flex';
+                    gsap.to(receiveView, { opacity: 1, duration: 0.5 });
+                    fetchRandomLetter(); 
+                }});
+            } else {
+                receiveView.style.display = 'none';
+                writeView.style.display = 'block';
+                gsap.fromTo(writeView, 
+                    { opacity: 0, y: 50, x: "-50%" }, 
+                    { opacity: 1, y: 0, x: "-50%", duration: 0.6, ease: "back.out(1.5)" }
+                );
+            }
+        }
+
+        // ================= 核心：随机且不重复收信 =================
+        async function fetchRandomLetter() {
+            // 1. 重置 UI 状态
+            const flap = document.getElementById('flap');
+            const seal = document.getElementById('seal');
+            const letter = document.getElementById('letter');
+            flap.style.zIndex = 4;
+            gsap.set(seal, { opacity: 1, scale: 1 });
+            gsap.set(flap, { rotationX: 0 });
+            gsap.set(letter, { y: 0, scale: 1, zIndex: 2, boxShadow: "0 10px 20px rgba(0,0,0,0.1)" });
+            document.getElementById('receive-hint').style.display = 'block';
+
+            // 2. 获取本地已读列表
+            const seenLetters = getSeenLetters();
+
+            // 3. 去数据库查询。注意，这里不查 status 了，查所有的信。
+            // 如果本地缓存里有数据，就用 .not('id', 'in', ...) 把它们排除掉
+            let query = db.from('letters').select('*');
+            if (seenLetters.length > 0) {
+                query = query.not('id', 'in', `(${seenLetters.join(',')})`);
+            }
+            
+            const { data, error } = await query;
+
+            if (error) {
+                console.error('捞信失败:', error);
+                return;
+            }
+
+            if (data && data.length > 0) {
+                // 随机挑一封
+                const randomIndex = Math.floor(Math.random() * data.length);
+                const letterData = data[randomIndex];
+                
+                currentLetterId = letterData.id; 
+                document.getElementById('letter-content').innerText = letterData.content;
+                document.getElementById('letter-style').innerText = `信纸：${letterData.paper_style || '法式复古'}`;
+            } else {
+                currentLetterId = null;
+                document.getElementById('letter-content').innerText = "海面上空空如也...\n\n你已经看完了所有的漂流瓶，不如自己扔一个？";
+                document.getElementById('letter-style').innerText = "信纸：无";
+                document.getElementById('receive-hint').style.display = 'none'; 
+            }
+        }
+
+        // 拆信动画（单纯播放动画，不用改数据库状态了）
+        const seal = document.getElementById('seal');
+        const flap = document.getElementById('flap');
+        const letter = document.getElementById('letter');
+        let isOpen = false;
+
+        seal.addEventListener('click', () => {
+            if (isOpen || !currentLetterId) return; 
+            isOpen = true;
+
+            // 把这封信的 ID 加入本地已读列表，以后再也不给你发了
+            addSeenLetter(currentLetterId);
+
+            gsap.to(seal, { opacity: 0, scale: 1.5, duration: 0.3 });
+            gsap.to(flap, { rotationX: 180, duration: 0.8, delay: 0.3, onComplete: () => { flap.style.zIndex = 1; }});
+            gsap.to(letter, { y: -150, scale: 1.15, duration: 1, delay: 1.1, ease: "power2.out", zIndex: 10, boxShadow: "0 20px 50px rgba(0,0,0,0.2)" });
+            document.getElementById('receive-hint').style.display = 'none';
+            
+            isOpen = false; // 重置打开状态，方便下次
+        });
+
+        // ================= 写信逻辑 =================
+        async function sendLetter() {
+            const content = document.getElementById('write-input').value;
+            const btn = document.getElementById('send-btn');
+            const paper = document.getElementById('write-paper');
+
+            if (!content.trim()) {
+                alert('信纸上还是空白的哦，写点什么吧～');
+                return;
+            }
+
+            btn.innerText = "正在投递...";
+            btn.disabled = true;
+
+            // 存入数据库
+            const { data, error } = await db
+                .from('letters')
+                .insert([{ 
+                    content: content, 
+                    paper_style: '法式微水彩'
+                }]);
+
+            if (error) {
+                console.error('投递失败:', error);
+                alert('投递失败了，请检查网络');
+                btn.innerText = "折叠并投递 🕊️";
+                btn.disabled = false;
+                return;
+            }
+
+            // 成功后的折叠动画
+            gsap.to(paper, {
+                scaleY: 0, scaleX: 0.8, y: 200, opacity: 0,
+                duration: 0.8, ease: "power2.in",
+                onComplete: () => {
+                    alert('🕊️ 漂流瓶已扔进大海，等待有缘人...');
+                    document.getElementById('write-input').value = ''; 
+                    btn.innerText = "折叠并投递 🕊️";
+                    btn.disabled = false;
+                    
+                    switchView('receive');
+                    gsap.set(paper, { scaleY: 1, scaleX: 1, y: 0, opacity: 1 });
+                }
+            });
+        }
+
+        fetchRandomLetter();
+    </script>
+</body>
+</html>
